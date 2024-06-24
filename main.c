@@ -1,13 +1,46 @@
 #include <math.h>
 #include <chipmunk.h>
 #include <SOIL.h>
+#include <windows.h>
 
 // Rotinas para acesso da OpenGL
 #include "opengl.h"
 
 // Funções para movimentação de objetos
-void moveRobo(cpBody* body, void* data);
-void moveBola(cpBody* body, void* data);
+
+// Time vermelho
+void move_goalkeeper_red(cpBody* body, void* data);
+void move_defender_red1(cpBody* body, void* data);
+void move_defender_red2(cpBody* body, void* data);
+void move_defender_red3(cpBody* body, void* data);
+void move_striker_red1(cpBody* body, void* data);
+void move_striker_red2(cpBody* body, void* data);
+
+// Time azul
+void move_goalkeeper_blue(cpBody* body, void* data);
+void move_defender_blue1(cpBody* body, void* data);
+void move_defender_blue2(cpBody* body, void* data);
+void move_defender_blue3(cpBody* body, void* data);
+void move_striker_blue1(cpBody* body, void* data);
+void move_striker_blue2(cpBody* body, void* data);
+
+// Detecta qual time esta com a bola
+boolean hasball(cpBody * body);
+
+// Detecta se um atacante esta perto de um defensor
+boolean striker_detected(cpBody * body);
+
+// Body vai para o lugar desejado
+void movement(cpBody * body, cpBody * where, cpFloat force);
+
+// Corpo vai para o gol
+void gotoposition(cpBody * body, cpVect position);
+
+// Corpo vai para atras da bola
+void gotoball(cpBody* body);
+
+// Reseta as posicoes, o algulo e a velocidade de todos os corpos
+void reset(cpBody *body, cpVect initialPosition, cpFloat initialAngle);
 
 // Prototipos
 void initCM();
@@ -37,6 +70,16 @@ cpBody* ballBody;
 
 // Um robô
 cpBody* robotBody;
+
+// Time vermelho
+cpBody* goalkeeper_red_Body, * defender_red_1_Body, * defender_red_2_Body, * defender_red_3_Body, * striker_red_1_Body, * striker_red_2_Body;
+
+// Time azul
+cpBody* goalkeeper_blue_Body, * defender_blue_1_Body, * defender_blue_2_Body, * defender_blue_3_Body, * striker_blue_1_Body, * striker_blue_2_Body;
+
+int team_choice, blue_striker, red_striker;
+
+boolean who_has_ball;
 
 // Cada passo de simulação é 1/60 seg.
 cpFloat timeStep = 1.0/60.0;
@@ -71,51 +114,294 @@ void initCM()
     //   - ponteiro para a função de movimentação (chamada a cada passo, pode ser NULL)
     //   - coeficiente de fricção
     //   - coeficiente de elasticidade
-    ballBody = newCircle(cpv(512,350), 8, 1, "small_football.png", moveBola, 0.2, 1);
+    ballBody = newCircle(cpv(512,350), 8, 1, "small_football.png", NULL, 0.2, 1);
 
-    // ... e um robô de exemplo
-    robotBody = newCircle(cpv(50,350), 20, 5, "ship1.png", moveRobo, 0.2, 0.5);
+    // Time vermelho
+    goalkeeper_red_Body = newCircle(cpv(60,350), 15, 5, "shipred.png", move_goalkeeper_red, 0.2, 0.5);
+    defender_red_1_Body = newCircle(cpv(250,200), 15, 5, "shipred.png", move_defender_red1, 0.2, 0.5);
+    defender_red_2_Body = newCircle(cpv(250,350), 15, 5, "shipred.png", move_defender_red2, 0.2, 0.5);
+    defender_red_3_Body = newCircle(cpv(250,500), 15, 5, "shipred.png", move_defender_red3, 0.2, 0.5);
+    striker_red_1_Body = newCircle(cpv(400,400), 15, 1, "shipred.png", move_striker_red1, 0.2, 0.5);
+    striker_red_2_Body = newCircle(cpv(400,300), 15, 1, "shipred.png", move_striker_red2, 0.2, 0.5);
+    
+    // Time azul
+    goalkeeper_blue_Body = newCircle(cpv(964,350), 15, 5, "shipblue.png", move_goalkeeper_blue, 0.2, 0.5);
+    defender_blue_1_Body = newCircle(cpv(774,200), 15, 5, "shipblue.png", move_defender_blue1, 0.2, 0.5);
+    defender_blue_2_Body = newCircle(cpv(774,350), 15, 5, "shipblue.png", move_defender_blue2, 0.2, 0.5);
+    defender_blue_3_Body = newCircle(cpv(774,500), 15, 5, "shipblue.png", move_defender_blue3, 0.2, 0.5);
+    striker_blue_1_Body = newCircle(cpv(624,400), 15, 1, "shipblue.png", move_striker_blue1, 0.2, 0.5);
+    striker_blue_2_Body = newCircle(cpv(624,300), 15, 1, "shipblue.png", move_striker_blue2, 0.2, 0.5);
+
+    restartCM();
 }
 
-// Exemplo de função de movimentação: move o robô em direção à bola
-void moveRobo(cpBody* body, void* data)
-{
-    // Veja como obter e limitar a velocidade do robô...
-    cpVect vel = cpBodyGetVelocity(body);
-//    printf("vel: %f %f", vel.x,vel.y);
+// Time vermelho
 
-    // Limita o vetor em 50 unidades
-    vel = cpvclamp(vel, 50);
-    // E seta novamente a velocidade do corpo
-    cpBodySetVelocity(body, vel);
+void move_goalkeeper_red(cpBody* body, void* data) {
+    
+}
 
-    // Obtém a posição do robô e da bola...
+void move_defender_red1(cpBody* body, void* data) {
+    if(striker_detected(body) && !who_has_ball) {
+        movement(body, ballBody, 1000);
+    }
+    if(hasball(body)) {
+        who_has_ball = TRUE;
+        movement(ballBody, body, 200);
+        cpVect position = cpv(964, rand()%450+250);
+        gotoposition(body, position);
+        if(cpBodyGetPosition(body).x >= 380 ) {
+            int striker = rand()%2+1;
+            if(striker == 1) {
+                movement(ballBody, striker_red_1_Body, 1000);
+            } else {
+                movement(ballBody, striker_red_2_Body, 1000);
+            }
+        }
+    }
+}
+
+void move_defender_red2(cpBody* body, void* data) {
+    if(striker_detected(body) && !who_has_ball) {
+        movement(body, ballBody, 1000);
+    }
+    if(hasball(body)) {
+        who_has_ball = TRUE;
+        movement(ballBody, body, 200);
+        cpVect position = cpv(964, rand()%450+250);
+        gotoposition(body, position);
+        if(cpBodyGetPosition(body).x >= 380 ) {
+            int striker = rand()%2+1;
+            if(striker == 1) {
+                movement(ballBody, striker_red_1_Body, 1000);
+            } else {
+                movement(ballBody, striker_red_2_Body, 1000);
+            }
+        }
+    }
+}
+
+void move_defender_red3(cpBody* body, void* data) {
+    if(striker_detected(body) && !who_has_ball) {
+        movement(body, ballBody, 1000);
+    }
+    if(hasball(body)) {
+        who_has_ball = TRUE;
+        movement(ballBody, body, 200);
+        cpVect position = cpv(964, rand()%450+250);
+        gotoposition(body, position);
+        if(cpBodyGetPosition(body).x >= 380 ) {
+            int striker = rand()%2+1;
+            if(striker == 1) {
+                movement(ballBody, striker_red_1_Body, 1000);
+            } else {
+                movement(ballBody, striker_red_2_Body, 1000);
+            }
+        }
+    }
+}
+
+void move_striker_red1(cpBody* body, void* data) {
+    // Passe inicial
+    if(red_striker == 1 && team_choice == 1) {
+        if(hasball(body)) {
+            movement(ballBody, striker_red_2_Body, 1000);
+        }
+    } else {
+        if(hasball(body)) {
+            who_has_ball = TRUE;
+            movement(ballBody, body, 200);
+            cpVect position = cpv(964, rand()%450+250);
+            gotoposition(body, position);
+        }
+    }
+}
+
+void move_striker_red2(cpBody* body, void* data) {
+    // Passe inicial
+    if(red_striker == 2 && team_choice == 1) {
+        if(hasball(body)) {
+            movement(ballBody, striker_red_1_Body, 1000);
+        }
+    } else {
+        if(hasball(body)) {
+            who_has_ball = TRUE;
+            //ballfollow(body, 200);
+            movement(ballBody, body, 200);
+            cpVect position = cpv(964, rand()%450+250);
+            gotoposition(body, position);
+        }
+    }
+}
+
+// Time azul
+
+void move_goalkeeper_blue(cpBody* body, void* data) {
+    
+}
+
+void move_defender_blue1(cpBody* body, void* data) {
+    if(striker_detected(body) && who_has_ball) {
+        movement(body, ballBody, 1000);
+    }
+    if(hasball(body)) {
+        who_has_ball = FALSE;
+        movement(ballBody, body, 200);
+        cpVect position = cpv(60, rand()%450+250);
+        gotoposition(body, position);
+        if(cpBodyGetPosition(body).x <= 644) {
+            int striker = rand()%2+1;
+            if(striker == 1) {
+                movement(ballBody, striker_blue_1_Body, 1000);
+            } else {
+                movement(ballBody, striker_blue_2_Body, 1000);
+            }
+        }
+    }
+}
+
+void move_defender_blue2(cpBody* body, void* data) {
+    if(striker_detected(body) && who_has_ball) {
+        movement(body, ballBody, 1000);
+    }
+    if(hasball(body)) {
+        who_has_ball = FALSE;
+        movement(ballBody, body, 200);
+        cpVect position = cpv(60, rand()%450+250);
+        gotoposition(body, position);;
+        if(cpBodyGetPosition(body).x <= 644) {
+            int striker = rand()%2+1;
+            if(striker == 1) {
+                movement(ballBody, striker_blue_1_Body, 1000);
+            } else {
+                movement(ballBody, striker_blue_2_Body, 1000);
+            }
+        }
+    }
+}
+
+void move_defender_blue3(cpBody* body, void* data) {
+    if(striker_detected(body) && who_has_ball) {
+        movement(body, ballBody, 1000);
+    }
+    if(hasball(body)) {
+        who_has_ball = FALSE;
+        movement(ballBody, body, 200);
+        cpVect position = cpv(60, rand()%450+250);
+        gotoposition(body, position);
+        if(cpBodyGetPosition(body).x <= 644) {
+            int striker = rand()%2+1;
+            if(striker == 1) {
+                movement(ballBody, striker_blue_1_Body, 1000);
+            } else {
+                movement(ballBody, striker_blue_2_Body, 1000);
+            }
+        }
+    }
+}
+
+void move_striker_blue1(cpBody* body, void* data) {
+    // Passe inicial
+    if(blue_striker == 1 && team_choice == 2) {
+        if(hasball(body)) {
+            movement(ballBody, striker_blue_2_Body, 1000);
+        }
+    } else {
+        if(hasball(body)) {
+            who_has_ball = FALSE;
+            movement(ballBody, body, 200);
+            cpVect position = cpv(60, rand()%450+250);
+            gotoposition(body, position);
+        }
+    }
+}
+
+void move_striker_blue2(cpBody* body, void* data) {
+    // Passe inicial
+    if(blue_striker == 2 && team_choice == 2) {
+        if(hasball(body)) {
+            movement(ballBody, striker_blue_1_Body, 1000);
+        }
+    } else {
+        if(hasball(body)) {
+            who_has_ball = FALSE;
+            movement(ballBody, body, 200);
+            cpVect position = cpv(60, rand()%450+250);
+            gotoposition(body, position);
+        }
+    }
+}
+
+boolean hasball(cpBody * body) {
     cpVect robotPos = cpBodyGetPosition(body);
     cpVect ballPos  = cpBodyGetPosition(ballBody);
+    boolean x = robotPos.x <= ballPos.x && robotPos.x >= ballPos.x-30 || robotPos.x >= ballPos.x && robotPos.x <= ballPos.x+30;
+    boolean y = robotPos.y <= ballPos.y && robotPos.y >= ballPos.y-30 || robotPos.y >= ballPos.y && robotPos.y <= ballPos.y+30;
+    if(x && y) {
+        return TRUE;
+    }
+    return FALSE;
+}
 
-    // Calcula um vetor do robô à bola (DELTA = B - R)
+boolean striker_detected(cpBody * body) {
+    cpVect robotPos = cpBodyGetPosition(body);
+    cpVect ballPos  = cpBodyGetPosition(ballBody);
+    boolean x = robotPos.x <= ballPos.x && robotPos.x >= ballPos.x-100 || robotPos.x >= ballPos.x && robotPos.x <= ballPos.x+100;
+    boolean y = robotPos.y <= ballPos.y && robotPos.y >= ballPos.y-100 || robotPos.y >= ballPos.y && robotPos.y <= ballPos.y+100;
+    if(x && y) {
+        return TRUE;
+    }
+    return FALSE;
+}
+
+void movement(cpBody * body, cpBody * where, cpFloat force) {
+    cpVect direction = cpvsub(cpBodyGetPosition(where), cpBodyGetPosition(body));
+    direction = cpvnormalize(direction);
+    cpVect impulse = cpvmult(direction, force);
+    cpBodyApplyForceAtWorldPoint(body, impulse, cpBodyGetPosition(body));
+}
+
+void gotoposition(cpBody * body, cpVect position) {
+        cpVect vel = cpBodyGetVelocity(body);
+
+        vel = cpvclamp(vel, 50);
+        cpBodySetVelocity(body, vel);
+
+        cpVect robotPos = cpBodyGetPosition(body);
+
+        cpVect pos = robotPos;
+        pos.x = -robotPos.x;
+        pos.y = -robotPos.y;
+        cpVect delta = cpvadd(position, pos);
+
+        int imp = rand()%40+20;
+        delta = cpvmult(cpvnormalize(delta),imp);
+        cpBodyApplyImpulseAtWorldPoint(body, delta, robotPos); 
+}
+
+void gotoball(cpBody* body)
+{
+    cpVect vel = cpBodyGetVelocity(body);
+    vel = cpvclamp(vel, 50);
+    cpBodySetVelocity(body, vel);
+    cpVect robotPos = cpBodyGetPosition(body);
+    cpVect ballPos  = cpBodyGetPosition(ballBody);
     cpVect pos = robotPos;
     pos.x = -robotPos.x;
     pos.y = -robotPos.y;
     cpVect delta = cpvadd(ballPos,pos);
 
-    // Limita o impulso em 20 unidades
-    delta = cpvmult(cpvnormalize(delta),20);
-    // Finalmente, aplica impulso no robô
+    int imp = rand()%40+20;
+    delta = cpvmult(cpvnormalize(delta),imp);
     cpBodyApplyImpulseAtWorldPoint(body, delta, robotPos);
 }
 
-// Exemplo: move a bola aleatoriamente
-void moveBola(cpBody* body, void* data)
-{
-    // Sorteia um impulso entre -10 e 10, para x e y
-    cpVect impulso = cpv(rand()%20-10,rand()%20-10);
-    // E aplica na bola
-    cpBodyApplyImpulseAtWorldPoint(body, impulso, cpBodyGetPosition(body));
-}
+
+
 
 // Libera memória ocupada por cada corpo, forma e ambiente
 // Acrescente mais linhas caso necessário
+
 void freeCM()
 {
     printf("Cleaning up!\n");
@@ -123,9 +409,57 @@ void freeCM()
     cpShapeFree(ud->shape);
     cpBodyFree(ballBody);
 
-    ud = cpBodyGetUserData(robotBody);
+    // Time vermelho
+
+    ud = cpBodyGetUserData(goalkeeper_red_Body);
     cpShapeFree(ud->shape);
-    cpBodyFree(robotBody);
+    cpBodyFree(goalkeeper_red_Body);
+
+    ud = cpBodyGetUserData(defender_red_1_Body);
+    cpShapeFree(ud->shape);
+    cpBodyFree(defender_red_1_Body);
+
+    ud = cpBodyGetUserData(defender_red_2_Body);
+    cpShapeFree(ud->shape);
+    cpBodyFree(defender_red_2_Body);
+
+    ud = cpBodyGetUserData(defender_red_3_Body);
+    cpShapeFree(ud->shape);
+    cpBodyFree(defender_red_3_Body);
+
+    ud = cpBodyGetUserData(striker_red_1_Body);
+    cpShapeFree(ud->shape);
+    cpBodyFree(striker_red_1_Body);
+
+    ud = cpBodyGetUserData(striker_red_2_Body);
+    cpShapeFree(ud->shape);
+    cpBodyFree(striker_red_2_Body);
+
+    // Time azul
+
+    ud = cpBodyGetUserData(goalkeeper_blue_Body);
+    cpShapeFree(ud->shape);
+    cpBodyFree(goalkeeper_blue_Body);
+
+    ud = cpBodyGetUserData(defender_blue_1_Body);
+    cpShapeFree(ud->shape);
+    cpBodyFree(defender_blue_1_Body);
+
+    ud = cpBodyGetUserData(defender_blue_2_Body);
+    cpShapeFree(ud->shape);
+    cpBodyFree(defender_blue_2_Body);
+
+    ud = cpBodyGetUserData(defender_blue_3_Body);
+    cpShapeFree(ud->shape);
+    cpBodyFree(defender_blue_3_Body);
+
+    ud = cpBodyGetUserData(striker_blue_1_Body);
+    cpShapeFree(ud->shape);
+    cpBodyFree(striker_blue_1_Body);
+
+    ud = cpBodyGetUserData(striker_blue_2_Body);
+    cpShapeFree(ud->shape);
+    cpBodyFree(striker_blue_2_Body);
 
     cpShapeFree(leftWall);
     cpShapeFree(rightWall);
@@ -139,9 +473,126 @@ void freeCM()
 void restartCM()
 {
     // Escreva o código para reposicionar os jogadores, ressetar o score, etc.
+    team_choice = (rand()%2)+1;
+    blue_striker = (rand()%2)+1;
+    red_striker = (rand()%2)+1;
+    cpVect pos;
+    
+    cpVect vel;
+    cpFloat initialAngle = 0.0;
+    
+    // Bola
+    pos.x = 512;
+    pos.y = 350;
+    reset(ballBody, pos, initialAngle);
+
+    // Time vermelho
+    pos.x = 60;
+    pos.y = 350;
+    reset(goalkeeper_red_Body, pos, initialAngle);
+
+    pos.x = 250;
+    pos.y = 200;
+    reset(defender_red_1_Body, pos, initialAngle);
+
+    pos.x = 250;
+    pos.y = 350;
+    reset(defender_red_2_Body, pos, initialAngle);
+
+    pos.x = 250;
+    pos.y = 500;
+    reset(defender_red_3_Body, pos, initialAngle);
+
+    pos.x = 400;
+    pos.y = 400;
+    reset(striker_red_1_Body, pos, initialAngle);
+
+    pos.x = 400;
+    pos.y = 300;
+    reset(striker_red_2_Body, pos, initialAngle);
+    
+
+    // Time azul
+    pos.x = 964;
+    pos.y = 350;
+    reset(goalkeeper_blue_Body, pos, initialAngle);
+
+    pos.x = 774;
+    pos.y = 200;
+    reset(defender_blue_1_Body, pos, initialAngle);
+
+    pos.x = 774;
+    pos.y = 350;
+    reset(defender_blue_2_Body, pos, initialAngle);
+
+    pos.x = 774;
+    pos.y = 500;
+    reset(defender_blue_3_Body, pos, initialAngle);
+
+    pos.x = 624;
+    pos.y = 400;
+    reset(striker_blue_1_Body, pos, initialAngle);
+
+    pos.x = 624;
+    pos.y = 300;
+    reset(striker_blue_2_Body, pos, initialAngle);
+
+
+
+
+    // Se a bola começar com o time vermelho
+    if(team_choice == 1) {
+        if(red_striker == 1) {
+            pos.x = 532;
+            pos.y = 350;
+            reset(striker_red_1_Body, pos, initialAngle);
+            pos.x = 400;
+            pos.y = 300;
+            reset(striker_red_2_Body, pos, initialAngle);
+        } else {
+            pos.x = 532;
+            pos.y = 350;
+            reset(striker_red_2_Body, pos, initialAngle);
+            pos.x = 400;
+            pos.y = 400;
+            reset(striker_red_1_Body, pos, initialAngle);
+        } 
+    // Se a bola começar com o time azul
+    } else {
+        if(blue_striker == 1) {
+            pos.x = 492;
+            pos.y = 350;
+            reset(striker_blue_1_Body, pos, initialAngle);
+            pos.x = 624;
+            pos.y = 300;
+            reset(striker_blue_2_Body, pos, initialAngle);
+        } else {
+            pos.x = 492;
+            pos.y = 350;
+            reset(striker_blue_2_Body, pos, initialAngle);
+            pos.x = 624;
+            pos.y = 400;
+            reset(striker_blue_1_Body, pos, initialAngle);
+        } 
+    }
+
+    
+
 
     // Não esqueça de ressetar a variável gameOver!
     gameOver = 0;
+}
+
+void reset(cpBody *body, cpVect initialPosition, cpFloat initialAngle) {
+    // Resetar a posição
+    cpBodySetPosition(body, initialPosition);
+    
+    // Resetar o ângulo
+    cpBodySetAngle(body, initialAngle);
+    
+    // Resetar a velocidade linear e angular para zero
+    cpBodySetVelocity(body, cpvzero);
+    cpBodySetAngularVelocity(body, 0.0);
 }
 
 // ************************************************************
